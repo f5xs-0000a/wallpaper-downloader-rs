@@ -1,0 +1,10 @@
+[package]
+name = "wallpaper-downloader"
+version = "0.1.0"
+authors = ["F5XS <f5xs.0000a@gmail.com>"]
+
+[dependencies]
+curl = "*"
+reqwest = "*"
+cursive = "*"
+parking_lot = "*"
