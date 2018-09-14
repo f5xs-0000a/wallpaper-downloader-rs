@@ -14,23 +14,34 @@ pub enum AllowedRating {
 }
 
 impl AllowedRating {
-    pub fn allows(&self, rating: &Rating) -> bool {
-        use self::Rating::*;
-        use self::AllowedRating::*;
+    pub fn allows(
+        &self,
+        rating: &Rating,
+    ) -> bool {
+        use self::{
+            AllowedRating::*,
+            Rating::*,
+        };
 
         match self {
             Only(r) => r == rating,
 
-            Above(r) => match r {
-                Safe => *rating == Safe,
-                Questionable => *rating == Safe || *rating == Questionable,
-                Explicit => true,
+            Above(r) => {
+                match r {
+                    Safe => *rating == Safe,
+                    Questionable => *rating == Safe || *rating == Questionable,
+                    Explicit => true,
+                }
             },
 
-            Below(r) => match r {
-                Safe => true,
-                Questionable => *rating == Questionable || *rating == Explicit,
-                Explicit => *rating == Explicit,
+            Below(r) => {
+                match r {
+                    Safe => true,
+                    Questionable => {
+                        *rating == Questionable || *rating == Explicit
+                    },
+                    Explicit => *rating == Explicit,
+                }
             },
 
             All => true,

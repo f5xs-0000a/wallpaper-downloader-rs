@@ -1,7 +1,11 @@
-use parking_lot::Mutex;
-use std::time::Duration;
-use parking_lot::MutexGuard;
-use std::time::Instant;
+use parking_lot::{
+    Mutex,
+    MutexGuard,
+};
+use std::time::{
+    Duration,
+    Instant,
+};
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -42,7 +46,8 @@ impl TimerMutex {
             //            duration_since
 
             // find the amount of time that has elapsed since last release
-            let duration_since = Instant::now().duration_since(last_release.clone());
+            let duration_since =
+                Instant::now().duration_since(last_release.clone());
 
             if let Some(sleep_dur) = self.duration.checked_sub(duration_since) {
                 // sleep for the remaining time

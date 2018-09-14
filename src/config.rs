@@ -1,8 +1,12 @@
-use std::path::PathBuf;
-use std::path::Path;
+use std::path::{
+    Path,
+    PathBuf,
+};
 
-use rating::AllowedRating;
-use rating::Rating;
+use rating::{
+    AllowedRating,
+    Rating,
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -19,7 +23,7 @@ impl Default for Config {
         let rating = AllowedRating::Above(Rating::Questionable);
 
         Config {
-            ratio: 16./9.,
+            ratio: 16. / 9.,
             tolerance: 1. / 1024.,
             allowed_rating: rating,
             location: Path::new(".").to_path_buf(),
@@ -28,8 +32,12 @@ impl Default for Config {
 }
 
 impl Config {
-    pub fn is_tolerated_aspect_ratio(&self, width: usize, height: usize) -> bool {
-        let aspect_ratio =  width as f64 / height as f64;
+    pub fn is_tolerated_aspect_ratio(
+        &self,
+        width: usize,
+        height: usize,
+    ) -> bool {
+        let aspect_ratio = width as f64 / height as f64;
         let difference = aspect_ratio - self.ratio;
 
         // the difference must satisfy a condition such that
