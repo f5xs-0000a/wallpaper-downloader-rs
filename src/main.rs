@@ -10,6 +10,8 @@ extern crate serde;
 
 mod timer;
 mod config;
+mod image_dl;
+mod rating;
 
 mod danbooru;
 
@@ -19,6 +21,8 @@ use sekibanki::Actor;
 use reqwest::Client;
 use std::sync::Arc;
 use tokio_threadpool::ThreadPool;
+
+use config::Config;
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -30,8 +34,23 @@ fn main() {
     // create the threadpool
     let threadpool = ThreadPool::new();
 
+    // create the global config;
+    let config = Arc::new(Config::default());
+
     // create the Danbooru main actor
-    let danbooru = danbooru::Danbooru::new(client.clone()).start_actor(Default::default(), threadpool.sender().clone());
+    danbooru::Danbooru::new(
+        client.clone(),
+        config.clone()
+    ).start_actor(
+        Default::default(),
+        threadpool.sender().clone()
+    );
+
+    // unfortunately, we still don't have a proper event loop because the
+    // ncurses is still not set up.
+    loop {
+        ::std::thread::sleep(::std::time::Duration::new(1, 0));
+    }
 
 
 

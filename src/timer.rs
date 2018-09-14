@@ -29,7 +29,7 @@ impl TimerMutex {
 
         // acquire the lock; the lock can't be acquired if someone else has
         // acquired it
-        let mut lockguard = self.lock.lock();
+        let lockguard = self.lock.lock();
 
         // find the amount of time it would take before it would be
         // `self.duration` seconds after the last lock

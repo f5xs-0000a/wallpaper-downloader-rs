@@ -1,69 +1,39 @@
-#[derive(Debug, Clone, Eq, Hash, PartialEq)]
-pub enum Rating {
-    Safe,
-    Questionable,
-    Explicit,
-}
+use std::path::PathBuf;
+use std::path::Path;
 
-#[derive(Debug, Clone, Eq, Hash, PartialEq)]
-pub enum AllowedRating {
-    Only(Rating),
-    Above(Rating),
-    Below(Rating),
-    All,
-}
+use rating::AllowedRating;
+use rating::Rating;
 
-impl AllowedRating {
-    pub fn allows(&self, rating: &Rating) -> bool {
-        use self::Rating;
-        use self::AllowedRating;
+////////////////////////////////////////////////////////////////////////////////
 
-        match self {
-            Only(r) => r == rating,
-
-            Above(r) => match r {
-                Safe => rating == Safe,
-                Questionable => rating == Safe || rating == Questionable,
-                Explicit => true,
-            },
-
-            Below(r) => match r {
-                Safe => true,
-                Questionable => rating == Questionable || rating == Explicit,
-                Explicit => rating == Explicit,
-            },
-
-            All => true,
-        }
-    }
-}
-
+#[derive(Debug)]
 pub struct Config {
     pub ratio: f64,
     pub tolerance: f64,
     pub allowed_rating: AllowedRating,
-    pub location: Path,
+    pub location: PathBuf,
 }
 
 impl Default for Config {
     fn default() -> Config {
-        let rating = AllowedRating::Above(Rating::Questionable),
+        let rating = AllowedRating::Above(Rating::Questionable);
 
         Config {
             ratio: 16./9.,
             tolerance: 1. / 1024.,
             allowed_rating: rating,
-            location: Path::new(".").clone(),
+            location: Path::new(".").to_path_buf(),
         }
     }
 }
 
 impl Config {
-    pub fn is_tolerated_aspect_ratio(width: usize, height: usize) -> bool {
+    pub fn is_tolerated_aspect_ratio(&self, width: usize, height: usize) -> bool {
         let aspect_ratio =  width as f64 / height as f64;
-        let difference = aspect_ratio - ratio;
+        let difference = aspect_ratio - self.ratio;
 
+        // the difference must satisfy a condition such that
         // -tolerance < difference < tolerance
-        -tolerance <= difference && difference <= tolerance
+        -self.tolerance <= difference && difference <= self.tolerance
     }
 }

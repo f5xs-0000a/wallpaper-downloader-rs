@@ -1,2 +1,5 @@
-target
+# ignore cargo.lock #
 Cargo.lock
+
+# ignore the target
+target/*

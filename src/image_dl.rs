@@ -1,3 +1,14 @@
+use std::fs::File;
+use std::sync::Arc;
+use reqwest::Client;
+use sekibanki::Actor;
+use sekibanki::ContextImmutHalf;
+
+use timer::TimerMutex;
+use config::Config;
+
+////////////////////////////////////////////////////////////////////////////////
+
 pub struct ImageDownloader {
     url: String,
     filename: String,
@@ -25,15 +36,14 @@ impl ImageDownloader {
 }
 
 impl Actor for ImageDownloader {
-    fn on_start(&mut self, _ctx: &ContextImmutHalf) {
-        use std::iter::once;
+    fn on_start(&mut self, _ctx: &ContextImmutHalf<Self>) {
         use tokio_threadpool::blocking;
 
         // generate the request
-        let mut request = self.client.get("https://danbooru.donmai.us/posts.json").build();
+        let request = self.client.get(self.url.as_str()).build().unwrap();
 
         // generate the response
-        let response = {
+        let mut response = {
             // try to acquire the lock and, at the same time, set the thread
             // state to blocking
             let _ = blocking(|| self.timer.lock());
@@ -45,15 +55,15 @@ impl Actor for ImageDownloader {
         };
 
         // create the file
-        let filepath = config.location.join(self.filename);
+        let filepath = self.config.location.join(&self.filename);
         // ignore the error for this one; it may have already been created
-        File::create(filepath);
+        File::create(filepath.clone());
 
         // open the file
-        let file = File::open(filepath).unwrap();
+        let mut file = File::open(filepath).unwrap();
 
         // write to the file
-        response.copy_to(file);
+        response.copy_to(&mut file);
 
         // promptly kill thyself
     }

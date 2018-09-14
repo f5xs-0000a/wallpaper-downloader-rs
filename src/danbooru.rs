@@ -4,9 +4,11 @@ use std::collections::hash_map::HashMap;
 use reqwest::Client;
 use std::sync::Arc;
 use std::time::Duration;
-use serde::Deserialize;
-use serde::Serialize;
+use std::ops::Not;
 
+use rating::Rating;
+use config::Config;
+use image_dl::ImageDownloader;
 use timer::TimerMutex;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -18,17 +20,17 @@ pub struct Danbooru {
     config: Arc<Config>,
 }
 
-pub struct DanbooruImage {
-    image_url: String,
-}
-
 #[derive(Debug)]
 #[derive(Serialize, Deserialize)]
 struct PostJSON {
     id: usize,
+
     image_width: usize,
     image_height: usize,
+
     file_url: String,
+    file_ext: String,
+
     tags: String,
     rating: String,
 }
@@ -44,11 +46,11 @@ impl Danbooru {
             timer: Arc::new(TimerMutex::new(Duration::new(1, 1))),
             client,
             tags,
+            config,
         }
     }
 
     fn page_request(&mut self, page: usize, ctx: &ContextImmutHalf<Self>) {
-        use std::iter::once;
         use tokio_threadpool::blocking;
 
         // generate the request form
@@ -76,22 +78,24 @@ impl Danbooru {
                 .expect("Error occurred when executing request.")
             
             // the lock is dropped here, allowing it to be reclaimed by someone else
-        }.json::<Vec<PostJSON>>();
+        }.json::<Vec<PostJSON>>()
+        .unwrap();
 
         // for every post in the search, try to find acceptable wallpapers
         response.into_iter()
             // the post should have an aspect ratio within tolerance
             .filter(|post| {
                 self.config
-                    .is_tolerated_aspect_ratio(image_width, image_height)
+                    .is_tolerated_aspect_ratio(post.image_width, post.image_height)
             })
 
             // the post should be within the rating standard
             .filter(|post| {
-                let rating = match post.rating {
-                    "s" => Safe,
-                    "q" => Questionable,
-                    "e" => Explicit,
+                let rating = match post.rating.as_str() {
+                    "s" => Rating::Safe,
+                    "q" => Rating::Questionable,
+                    "e" => Rating::Explicit,
+                    _ => unreachable!(),
                 };
 
                 self.config
@@ -116,17 +120,17 @@ impl Danbooru {
 
             // create an actor for each of the accepted links so that the image
             // may be downloaded
-            .foreach(|post| {
+            .for_each(|post| {
                 // create the image downloader
                 ImageDownloader::new(
-                    post.url,
-                    filename: format!("danbooru {}.{}", post.id, post.file_ext),
+                    post.file_url,
+                    format!("danbooru {}.{}", post.id, post.file_ext),
                     self.config.clone(),
                     self.client.clone(),
                     self.timer.clone(),
                 )
                     // then start the actor
-                    .start_actor()
+                    .start_actor(Default::default(), ctx.threadpool().clone());
 
                 // then promptly drop the address to the actor. it will still
                 // execute its function although it will be dropped once its
@@ -144,7 +148,7 @@ impl Actor for Danbooru {
 
         // start the loop
         for page in 1.. {
-            self.request_page(page, ctx);
+            self.page_request(page, ctx);
         }
     }
 }
