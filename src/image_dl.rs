@@ -10,6 +10,7 @@ use std::{
 
 use config::Config;
 use timer::TimerMutex;
+use timer::do_lock;
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -44,8 +45,6 @@ impl Actor for ImageDownloader {
         &mut self,
         _ctx: &ContextImmutHalf<Self>,
     ) {
-        use tokio_threadpool::blocking;
-
         // generate the request
         let request = self.client.get(self.url.as_str()).build().unwrap();
 
@@ -53,9 +52,9 @@ impl Actor for ImageDownloader {
 
         // generate the response
         let mut response = {
-            // try to acquire the lock and, at the same time, set the thread
-            // state to blocking
-            let _ = blocking(|| self.timer.lock());
+            // try to acquire the lock
+            let _ = do_lock(&self.timer);
+
             self.client
                 .execute(request)
                 .expect("Error occurred when executing request.")

@@ -4,6 +4,7 @@ extern crate reqwest;
 extern crate sekibanki;
 extern crate serde;
 extern crate tokio_threadpool;
+extern crate futures;
 #[macro_use]
 extern crate serde_derive;
 

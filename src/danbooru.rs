@@ -14,6 +14,7 @@ use config::Config;
 use image_dl::ImageDownloader;
 use rating::Rating;
 use timer::TimerMutex;
+use timer::do_lock;
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -61,8 +62,6 @@ impl Danbooru {
         page: usize,
         ctx: &ContextImmutHalf<Self>,
     ) {
-        use tokio_threadpool::blocking;
-
         // generate the request form
         let mut request =
             self.client.get("https://danbooru.donmai.us/posts.json");
@@ -85,9 +84,9 @@ impl Danbooru {
 
         // generate the response
         let response = {
-            // try to acquire the lock and, at the same time, set the thread
-            // state to blocking
-            let _ = blocking(|| self.timer.lock());
+            // try to acquire the lock
+            let _ = do_lock(&self.timer);
+
             self.client
                 .execute(request)
                 .expect("Error occurred when executing request.")

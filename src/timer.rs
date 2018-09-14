@@ -6,6 +6,7 @@ use std::time::{
     Duration,
     Instant,
 };
+use tokio_threadpool::blocking;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -35,6 +36,8 @@ impl TimerMutex {
         // acquired it
         let lockguard = self.lock.lock();
 
+        println!("Lock acquired!");
+
         // find the amount of time it would take before it would be
         // `self.duration` seconds after the last lock
         if let Some(ref last_release) = *lockguard {
@@ -62,6 +65,22 @@ impl TimerMutex {
 impl<'a> Drop for TimerLock<'a> {
     fn drop(&mut self) {
         // record the time the lock was dropped
-        *self.0 = Some(Instant::now())
+        *self.0 = Some(Instant::now());
+
+        println!("Lock released!");
+    }
+}
+
+#[inline]
+pub fn do_lock<'a>(mutex: &'a TimerMutex) -> TimerLock<'a> {
+    let async = blocking(|| mutex.lock())
+        .expect("timer::do_lock() must be called if the calling thread is on a ThreadPool.");
+
+    if let ::futures::Async::Ready(lock) = async {
+        lock
+    }
+
+    else {
+        panic!("Maximum number of blocking threads reached!. You may want to consider increasing this.");
     }
 }
