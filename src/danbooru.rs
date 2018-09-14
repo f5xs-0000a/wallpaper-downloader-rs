@@ -137,9 +137,10 @@ impl Danbooru {
         page: usize,
         ctx: &ContextImmutHalf<Self>,
     ) {
+        let url = "https://danbooru.donmai.us/posts.json";
+
         // generate the request form
-        let mut request =
-            self.client.get("https://danbooru.donmai.us/posts.json");
+        let mut request = self.client.get(url);
 
         // temporarily place the pages into the tags
         self.tags.insert("page".to_owned(), format!("{}", page));
@@ -147,24 +148,18 @@ impl Danbooru {
         // place the json payload
         request.json(&self.tags);
 
-        // build the request
-        let request = request
-            .build()
-            // we can't possibly fail the request build, so we unwrap
-            .unwrap();
-
         // then remove the pages
         self.tags.remove("page");
 
-        println!("Attempting to download from {}", request.url());
+        println!("Attempting to download from {}", url);
 
         // generate the response
         let response = {
             // try to acquire the lock
             let _ = do_lock(&self.timer);
 
-            self.client
-                .execute(request)
+            request
+                .send()
                 .expect("Error occurred when executing request.")
 
             // the lock is dropped here, allowing it to be reclaimed by someone

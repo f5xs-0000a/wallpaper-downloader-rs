@@ -5,6 +5,7 @@ use sekibanki::{
 };
 use std::{
     fs::File,
+    io::Write,
     sync::Arc,
 };
 
@@ -47,35 +48,49 @@ impl Actor for ImageDownloader {
         &mut self,
         _ctx: &ContextImmutHalf<Self>,
     ) {
+        use std::fs::OpenOptions;
         // generate the request
-        let request = self.client.get(self.url.as_str()).build().unwrap();
+        let mut request = self.client.get(self.url.as_str());
 
-        println!("Attempting to download from {}", request.url());
+        println!("Attempting to download from {}", self.url);
 
         // generate the response
         let mut response = {
             // try to acquire the lock
             let _ = do_lock(&self.timer);
 
-            self.client
-                .execute(request)
-                .expect("Error occurred when executing request.")
+            let response = request
+                .send()
+                .expect("Error occurred when executing request.");
+
+            println!("{}", response.status());
+
+            response
 
             // the lock is dropped here, allowing it to be reclaimed by someone
             // else
         };
 
+        // TODO: use a buffer that will notify ncurses about the progress next
+        // time
+        // TODO: copying the content to the buffer is a blocking effort. wrap it
+        // in a blocking()
+        let mut buffer = Vec::new();
+        let result = response.copy_to(&mut buffer).unwrap();
+
         // create the file
         let filepath = self.config.location.join(&self.filename);
-        // ignore the error for this one; it may have already been created
-        File::create(filepath.clone());
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create(true)
+            .append(false)
+            .open(filepath)
+            .unwrap();
 
-        // open the file
-        let mut file = File::open(filepath).unwrap();
-
-        // write to the file
-        response.copy_to(&mut file);
+        file.write(&*buffer);
+        file.flush();
 
         // promptly kill thyself
+        println!("Finished downloading {}", self.filename);
     }
 }
