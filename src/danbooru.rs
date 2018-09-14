@@ -2,6 +2,8 @@ use reqwest::Client;
 use sekibanki::{
     Actor,
     ContextImmutHalf,
+    Handles,
+    Message,
 };
 use std::{
     collections::hash_map::HashMap,
@@ -13,8 +15,10 @@ use std::{
 use config::Config;
 use image_dl::ImageDownloader;
 use rating::Rating;
-use timer::TimerMutex;
-use timer::do_lock;
+use timer::{
+    do_lock,
+    TimerMutex,
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -39,6 +43,9 @@ struct PostJSON {
     rating:     String,
 }
 
+#[derive(Debug, Clone, Eq, Hash, PartialEq)]
+struct SearchPageNo(usize);
+
 ////////////////////////////////////////////////////////////////////////////////
 
 impl Danbooru {
@@ -57,47 +64,13 @@ impl Danbooru {
         }
     }
 
-    fn page_request(
-        &mut self,
-        page: usize,
+    fn process_post_list(
+        &self,
+        post_list: impl Iterator<Item = PostJSON>,
         ctx: &ContextImmutHalf<Self>,
     ) {
-        // generate the request form
-        let mut request =
-            self.client.get("https://danbooru.donmai.us/posts.json");
-
-        // temporarily place the pages into the tags
-        self.tags.insert("page".to_owned(), format!("{}", page));
-
-        // place the json payload
-        request.json(&self.tags);
-
-        // build the request
-        let request = request
-            .build()
-            .expect("Unexpected error while building the request.");
-
-        // then remove the pages
-        self.tags.remove("page");
-
-        println!("Attempting to download from {}", request.url());
-
-        // generate the response
-        let response = {
-            // try to acquire the lock
-            let _ = do_lock(&self.timer);
-
-            self.client
-                .execute(request)
-                .expect("Error occurred when executing request.")
-
-            // the lock is dropped here, allowing it to be reclaimed by someone
-            // else
-        }.json::<Vec<PostJSON>>()
-        .unwrap();
-
         // for every post in the search, try to find acceptable wallpapers
-        response.into_iter()
+        post_list
             // there must be an available URL
             .filter(|post| {
                 post.file_url.is_some() &&
@@ -158,6 +131,52 @@ impl Danbooru {
                 // function has ended
             });
     }
+
+    fn page_request(
+        &mut self,
+        page: usize,
+        ctx: &ContextImmutHalf<Self>,
+    ) {
+        // generate the request form
+        let mut request =
+            self.client.get("https://danbooru.donmai.us/posts.json");
+
+        // temporarily place the pages into the tags
+        self.tags.insert("page".to_owned(), format!("{}", page));
+
+        // place the json payload
+        request.json(&self.tags);
+
+        // build the request
+        let request = request
+            .build()
+            // we can't possibly fail the request build, so we unwrap
+            .unwrap();
+
+        // then remove the pages
+        self.tags.remove("page");
+
+        println!("Attempting to download from {}", request.url());
+
+        // generate the response
+        let response = {
+            // try to acquire the lock
+            let _ = do_lock(&self.timer);
+
+            self.client
+                .execute(request)
+                .expect("Error occurred when executing request.")
+
+            // the lock is dropped here, allowing it to be reclaimed by someone
+            // else
+        }.json::<Vec<PostJSON>>()
+        .unwrap();
+
+        self.process_post_list(response.into_iter(), ctx);
+
+        // notify self to perform the next page
+        ctx.notify(SearchPageNo(page + 1))
+    }
 }
 
 impl Actor for Danbooru {
@@ -165,14 +184,19 @@ impl Actor for Danbooru {
         &mut self,
         ctx: &ContextImmutHalf<Self>,
     ) {
-        // TODO: actually, shouldn't be like this.
-        // you need the actor to notify itself that it should perform the next
-        // page so that it may be able to intercept messages from other places
-        // too
+        // notify self to do page 1
+        ctx.notify(SearchPageNo(1));
+    }
+}
 
-        // start the loop
-        for page in 1 .. {
-            self.page_request(page, ctx);
-        }
+impl Handles<SearchPageNo> for Danbooru {
+    type Response = ();
+
+    fn handle(
+        &mut self,
+        msg: SearchPageNo,
+        ctx: &ContextImmutHalf<Self>,
+    ) -> Self::Response {
+        self.page_request(msg.0, ctx);
     }
 }

@@ -9,8 +9,10 @@ use std::{
 };
 
 use config::Config;
-use timer::TimerMutex;
-use timer::do_lock;
+use timer::{
+    do_lock,
+    TimerMutex,
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 

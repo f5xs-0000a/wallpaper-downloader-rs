@@ -73,14 +73,17 @@ impl<'a> Drop for TimerLock<'a> {
 
 #[inline]
 pub fn do_lock<'a>(mutex: &'a TimerMutex) -> TimerLock<'a> {
-    let async = blocking(|| mutex.lock())
-        .expect("timer::do_lock() must be called if the calling thread is on a ThreadPool.");
+    let async_blocker = blocking(|| mutex.lock()).expect(
+        "timer::do_lock() must be called if the calling thread is on a \
+         ThreadPool.",
+    );
 
-    if let ::futures::Async::Ready(lock) = async {
+    if let ::futures::Async::Ready(lock) = async_blocker {
         lock
-    }
-
-    else {
-        panic!("Maximum number of blocking threads reached!. You may want to consider increasing this.");
+    } else {
+        panic!(
+            "Maximum number of blocking threads reached!. You may want to \
+             consider increasing this."
+        );
     }
 }
