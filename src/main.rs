@@ -1,10 +1,11 @@
-extern crate cursive;
+//extern crate cursive;
 extern crate futures;
 extern crate parking_lot;
 extern crate reqwest;
 extern crate sekibanki;
 extern crate serde;
 extern crate tokio_threadpool;
+extern crate chrono;
 #[macro_use]
 extern crate serde_derive;
 
@@ -14,6 +15,7 @@ mod config;
 mod image_dl;
 mod rating;
 mod timer;
+mod util;
 
 mod danbooru;
 
@@ -39,8 +41,10 @@ fn main() {
     let config = Arc::new(Config::default());
 
     // create the Danbooru main actor
-    danbooru::Danbooru::new(client.clone(), config.clone())
+    let mut danbooru = danbooru::Danbooru::new(client.clone(), config.clone())
         .start_actor(Default::default(), threadpool.sender().clone());
+
+    danbooru.send(danbooru::SearchPageNo(230));
 
     // unfortunately, we still don't have a proper event loop because the
     // ncurses is still not set up.

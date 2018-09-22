@@ -12,6 +12,7 @@ use std::{
     time::Duration,
 };
 
+use util::time_now;
 use config::Config;
 use image_dl::ImageDownloader;
 use rating::Rating;
@@ -44,7 +45,7 @@ struct PostJSON {
 }
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
-struct SearchPageNo(usize);
+pub struct SearchPageNo(pub usize);
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -54,7 +55,8 @@ impl Danbooru {
         config: Arc<Config>,
     ) -> Danbooru {
         let mut tags = HashMap::new();
-        tags.insert("limit".to_owned(), "128".to_owned());
+        tags.insert("limit".to_owned(), "1000".to_owned());
+        tags.insert("tags".to_owned(), "touhou -rating:e".to_owned());
 
         Danbooru {
             timer: Arc::new(TimerMutex::new(Duration::new(1, 1))),
@@ -151,21 +153,49 @@ impl Danbooru {
         // then remove the pages
         self.tags.remove("page");
 
-        println!("Attempting to download from {}", url);
+        println!("[{}] Attempting to download from {}, page {}", time_now(), url, page);
 
         // generate the response
         let response = {
             // try to acquire the lock
             let _ = do_lock(&self.timer);
 
-            request
-                .send()
-                .expect("Error occurred when executing request.")
+            request.send()
 
             // the lock is dropped here, allowing it to be reclaimed by someone
             // else
-        }.json::<Vec<PostJSON>>()
-        .unwrap();
+        };
+        
+        // catch whatever happens in the requesting
+        let response = match response {
+            Ok(mut res) => res.json::<Vec<PostJSON>>(),
+            Err(e) => {
+                println!("[{}] Error processing the response: {:?}", time_now(), e);
+
+                // retry downloading the same page
+                ctx.notify(SearchPageNo(page));
+                return;
+            }
+        };
+
+        // catch whatever happens in the deserialization
+        let response = match response {
+            Ok(res) => res,
+            Err(e) => {
+                println!("[{}] Error deserializing JSON text: {:?}", time_now(), e);
+
+                // retry downloading the same page
+                ctx.notify(SearchPageNo(page));
+                return;
+            }
+        };
+
+        // The query finishes if danbooru has no more posts returned.
+        // TODO: not always
+        if response.is_empty() {
+            println!("[{}] Finished! No more posts to get!", time_now());
+            return;
+        }
 
         self.process_post_list(response.into_iter(), ctx);
 
@@ -179,8 +209,6 @@ impl Actor for Danbooru {
         &mut self,
         ctx: &ContextImmutHalf<Self>,
     ) {
-        // notify self to do page 1
-        ctx.notify(SearchPageNo(1));
     }
 }
 

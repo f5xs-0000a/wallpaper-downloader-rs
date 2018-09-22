@@ -36,8 +36,6 @@ impl TimerMutex {
         // acquired it
         let lockguard = self.lock.lock();
 
-        println!("Lock acquired!");
-
         // find the amount of time it would take before it would be
         // `self.duration` seconds after the last lock
         if let Some(ref last_release) = *lockguard {
@@ -66,8 +64,6 @@ impl<'a> Drop for TimerLock<'a> {
     fn drop(&mut self) {
         // record the time the lock was dropped
         *self.0 = Some(Instant::now());
-
-        println!("Lock released!");
     }
 }
 
