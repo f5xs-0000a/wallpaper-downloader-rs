@@ -2,15 +2,17 @@
 name = "wallpaper-downloader"
 version = "0.1.0"
 authors = ["F5XS <f5xs.0000a@gmail.com>"]
+#build = "build.rs"
 
 [dependencies]
 reqwest = "*"
-cursive = "*"
 parking_lot = "*"
 tokio-threadpool = "*"
 serde = "1.0.78"
 serde_derive = "1.0.78"
 futures = "0.1.24"
+ws = "*"
+rocket = "*"
 
 [dependencies.sekibanki]
 path = "../LICHTFANTASIE/sekibanki/"
