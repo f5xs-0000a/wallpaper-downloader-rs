@@ -1,4 +1,3 @@
-//extern crate cursive;
 extern crate futures;
 extern crate parking_lot;
 extern crate reqwest;
@@ -51,11 +50,4 @@ fn main() {
     loop {
         ::std::thread::sleep(::std::time::Duration::new(1, 0));
     }
-
-    // user, through curses, can modify the properties being used
-
-    // site manager reads through the properties, iterates through the list, and
-    // spawns a unit executable that processes each accepted link
-
-    // unit executable attempts to download the payload and exits promptly
 }

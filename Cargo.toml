@@ -5,14 +5,14 @@ authors = ["F5XS <f5xs.0000a@gmail.com>"]
 
 [dependencies]
 reqwest = "*"
-cursive = "*"
 parking_lot = "*"
 tokio-threadpool = "*"
 serde = "1.0.78"
 serde_derive = "1.0.78"
 futures = "0.1.24"
-openssl = { version = "0.10", features = ["vendored"] }
 chrono = "*"
+ws = "*"
+rocket = "*"
 
 [dependencies.sekibanki]
 path = "../LICHTFANTASIE/sekibanki/"
