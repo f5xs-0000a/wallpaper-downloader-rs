@@ -105,10 +105,6 @@ impl Search {
         }
 
         if (&tags).split_whitespace().count() < allowable_tags {
-            push_tag(&mut tags, "touhou");
-        }
-
-        if (&tags).split_whitespace().count() < allowable_tags {
             push_tag(&mut tags, "-rating:e");
         }
 
@@ -184,20 +180,6 @@ impl Danbooru {
             // the post should not be deleted
             .filter(|post| {
                 !post.is_deleted
-            })
-
-            // the post should have a "touhou" tag
-            .filter(|post| {
-                // split the tags string by spaces, then iterate through them,
-                // trying to find the "animated" tag
-
-                post.tag_string
-                    .split_whitespace()
-                    .any(|tag| tag == "touhou")
-
-                    // since this will return true if the tag "animated" is
-                    // found, we must negate that so the iterator skips the post
-                    // that has the tag
             })
 
             // create an actor for each of the accepted links so that the image
