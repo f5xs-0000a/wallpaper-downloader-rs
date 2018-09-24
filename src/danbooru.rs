@@ -298,7 +298,7 @@ impl Danbooru {
             .clone();
 
         let next_request = match search {
-            Search::Under(_) => {
+            Search::Under(_) | Search::Start => {
                 let lowest_id = response
                     .iter()
                     .min_by(|lpost, rpost| lpost.id.cmp(&rpost.id))
@@ -317,8 +317,6 @@ impl Danbooru {
                     .clone();
                 Search::Above(highest_id)
             },
-
-            _ => unimplemented!(),
         };
 
         self.process_post_list(response.into_iter(), ctx);

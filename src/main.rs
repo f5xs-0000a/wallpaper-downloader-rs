@@ -43,7 +43,7 @@ fn main() {
     let mut danbooru = danbooru::Danbooru::new(client.clone(), config.clone())
         .start_actor(Default::default(), threadpool.sender().clone());
 
-    danbooru.send(danbooru::Search::Under(2742767));
+    danbooru.send(danbooru::Search::Start);
 
     // unfortunately, we still don't have a proper event loop because the
     // ncurses is still not set up.

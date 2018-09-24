@@ -1,10 +1,7 @@
-use chrono::{
-    DateTime,
-    Utc,
-};
+use chrono::Local;
 
 ////////////////////////////////////////////////////////////////////////////////
 
 pub fn time_now() -> String {
-    Utc::now().to_rfc3339()
+    format!("{}", Local::now().format("%F %T%.3f"))
 }

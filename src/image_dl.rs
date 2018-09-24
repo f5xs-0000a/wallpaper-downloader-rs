@@ -53,6 +53,8 @@ impl Actor for ImageDownloader {
         _ctx: &ContextImmutHalf<Self>,
     ) {
         use std::fs::OpenOptions;
+        use util::time_now;
+
         // generate the request
         let mut request = self.client.get(self.url.as_str());
 
@@ -120,6 +122,6 @@ impl Actor for ImageDownloader {
         file.flush();
 
         // promptly kill thyself
-        println!("Finished downloading {}", self.filename);
+        println!("[{}] Finished downloading {}", time_now(), self.filename);
     }
 }
