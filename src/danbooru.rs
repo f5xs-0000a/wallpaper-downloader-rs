@@ -284,18 +284,18 @@ impl Danbooru {
             println!("[{}] Finished! No more posts to get!", time_now());
             return;
         }
-                let lowest_id = response
-                    .iter()
-                    .min_by(|lpost, rpost| lpost.id.cmp(&rpost.id))
-                    .unwrap()
-                    .id
-                    .clone();
-                let highest_id = response
-                    .iter()
-                    .min_by(|lpost, rpost| lpost.id.cmp(&rpost.id))
-                    .unwrap()
-                    .id
-                    .clone();
+        let lowest_id = response
+            .iter()
+            .min_by(|lpost, rpost| lpost.id.cmp(&rpost.id))
+            .unwrap()
+            .id
+            .clone();
+        let highest_id = response
+            .iter()
+            .min_by(|lpost, rpost| lpost.id.cmp(&rpost.id))
+            .unwrap()
+            .id
+            .clone();
 
         let next_request = match search {
             Search::Under(_) => {
