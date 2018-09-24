@@ -16,6 +16,7 @@ imports_layout = "Vertical"
 merge_imports = true
 match_block_trailing_comma = true
 force_multiline_blocks = true
+normalize_comments = true
 reorder_impl_items = true
 space_after_colon = true
 struct_field_align_threshold = 8 # may be subject to change
@@ -41,7 +42,6 @@ edition = "Edition2018"
 # match_arm_blocks = true
 # blank_lines_upper_bound = 1
 # blank_lines_lower_bound = 0
-# normalize_comments = false
 # report_todo = "Never"
 # report_fixme = "Never"
 

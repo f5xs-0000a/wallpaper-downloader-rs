@@ -4,10 +4,12 @@ use sekibanki::{
     ContextImmutHalf,
 };
 use std::{
-    fs::File,
+    fs::{
+        remove_file,
+        File,
+    },
     io::Write,
     sync::Arc,
-    fs::remove_file,
 };
 
 use config::Config;
@@ -70,11 +72,15 @@ impl Actor for ImageDownloader {
         let mut response = match response {
             Ok(res) => res,
             Err(e) => {
-                println!("[{}] Error processing the response: {:?}", time_now(), e);
+                println!(
+                    "[{}] Error processing the response: {:?}",
+                    time_now(),
+                    e
+                );
                 // but do not attempt to download the image again
                 // TODO: this behavior will change in the future
                 return;
-            }
+            },
         };
 
         // TODO: use a buffer that will notify ncurses about the progress next
@@ -89,7 +95,7 @@ impl Actor for ImageDownloader {
 
         // try to delete the file first, if it exists.
         remove_file(&filepath);
-        
+
         // then create the file to be writable
         let mut file = OpenOptions::new()
             .write(true)
@@ -100,10 +106,14 @@ impl Actor for ImageDownloader {
         let mut file = match file {
             Ok(f) => f,
             Err(e) => {
-                println!("[{}] Error opening the file {:?} for write access: {:?}",
-                         time_now(), filepath.to_str(), e);
+                println!(
+                    "[{}] Error opening the file {:?} for write access: {:?}",
+                    time_now(),
+                    filepath.to_str(),
+                    e
+                );
                 return;
-            }
+            },
         };
 
         file.write(&*buffer);

@@ -12,7 +12,6 @@ use std::{
     time::Duration,
 };
 
-use util::time_now;
 use config::Config;
 use image_dl::ImageDownloader;
 use rating::Rating;
@@ -20,13 +19,14 @@ use timer::{
     do_lock,
     TimerMutex,
 };
+use util::time_now;
 
 ////////////////////////////////////////////////////////////////////////////////
 
 pub struct Danbooru {
     timer:  Arc<TimerMutex>, // TODO: use nazrin in the future
     client: Arc<Client>,
-    tags:   HashMap<String, String>,
+    data:   HashMap<String, String>,
     config: Arc<Config>,
 }
 
@@ -42,26 +42,93 @@ struct PostJSON {
 
     tag_string: String,
     rating:     String,
+
+    is_deleted: bool,
 }
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
-pub struct SearchPageNo(pub usize);
+pub enum Search {
+    Start,
+    Under(usize),
+    Above(usize),
+}
+
+#[derive(Debug, Clone, Eq, Hash, PartialEq)]
+pub enum Direction {
+    Later,
+    Earlier,
+}
 
 ////////////////////////////////////////////////////////////////////////////////
+
+impl Direction {
+    pub fn is_later(&self) -> bool {
+        match self {
+            Direction::Later => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_earlier(&self) -> bool {
+        match self {
+            Direction::Earlier => true,
+            _ => false,
+        }
+    }
+}
+
+impl Search {
+    pub fn get_from_direction(&self) -> Option<(usize, Direction)> {
+        match self {
+            Search::Start => None,
+            Search::Under(x) => Some((x.clone(), Direction::Earlier)),
+            Search::Above(x) => Some((x.clone(), Direction::Later)),
+        }
+    }
+
+    pub fn obtain_tags(&self) -> String {
+        let mut tags = String::new();
+        let allowable_tags = 2;
+
+        let push_tag = |tags: &mut String, tag: &str| {
+            tags.push_str(tag);
+            tags.push(' ');
+        };
+
+        if let Some((from, direction)) = self.get_from_direction() {
+            if direction.is_later() {
+                push_tag(&mut tags, &format!("id:>{}", from));
+                push_tag(&mut tags, "order:id_asc");
+            } else {
+                push_tag(&mut tags, &format!("id:<{}", from));
+            }
+        }
+
+        if (&tags).split_whitespace().count() < allowable_tags {
+            push_tag(&mut tags, "touhou");
+        }
+
+        if (&tags).split_whitespace().count() < allowable_tags {
+            push_tag(&mut tags, "-rating:e");
+        }
+
+        tags
+    }
+}
 
 impl Danbooru {
     pub fn new(
         client: Arc<Client>,
         config: Arc<Config>,
     ) -> Danbooru {
-        let mut tags = HashMap::new();
-        tags.insert("limit".to_owned(), "1000".to_owned());
-        tags.insert("tags".to_owned(), "touhou -rating:e".to_owned());
+        let mut data = HashMap::new();
+        data.insert("limit".to_owned(), "1000".to_owned());
+        data.insert("page".to_owned(), "1".to_owned());
 
         Danbooru {
-            timer: Arc::new(TimerMutex::new(Duration::new(1, 1))),
+            timer: Arc::new(TimerMutex::new(Duration::new(1, 0))),
             client,
-            tags,
+            data,
             config,
         }
     }
@@ -114,6 +181,25 @@ impl Danbooru {
                     .not()
             })
 
+            // the post should not be deleted
+            .filter(|post| {
+                !post.is_deleted
+            })
+
+            // the post should have a "touhou" tag
+            .filter(|post| {
+                // split the tags string by spaces, then iterate through them,
+                // trying to find the "animated" tag
+
+                post.tag_string
+                    .split_whitespace()
+                    .any(|tag| tag == "touhou")
+
+                    // since this will return true if the tag "animated" is
+                    // found, we must negate that so the iterator skips the post
+                    // that has the tag
+            })
+
             // create an actor for each of the accepted links so that the image
             // may be downloaded
             .for_each(|mut post| {
@@ -134,26 +220,20 @@ impl Danbooru {
             });
     }
 
-    fn page_request(
+    fn request(
         &mut self,
-        page: usize,
+        search: Search,
         ctx: &ContextImmutHalf<Self>,
     ) {
         let url = "https://danbooru.donmai.us/posts.json";
 
+        // generate the tags
+        self.data.insert("tags".to_owned(), search.obtain_tags());
+
         // generate the request form
-        let mut request = self.client.get(url);
+        let mut request = self.client.get(url).json(&self.data);
 
-        // temporarily place the pages into the tags
-        self.tags.insert("page".to_owned(), format!("{}", page));
-
-        // place the json payload
-        request.json(&self.tags);
-
-        // then remove the pages
-        self.tags.remove("page");
-
-        println!("[{}] Attempting to download from {}, page {}", time_now(), url, page);
+        println!("[{}] Attempting to download from {}", time_now(), url);
 
         // generate the response
         let response = {
@@ -165,29 +245,37 @@ impl Danbooru {
             // the lock is dropped here, allowing it to be reclaimed by someone
             // else
         };
-        
+
         // catch whatever happens in the requesting
         let response = match response {
             Ok(mut res) => res.json::<Vec<PostJSON>>(),
             Err(e) => {
-                println!("[{}] Error processing the response: {:?}", time_now(), e);
+                println!(
+                    "[{}] Error processing the response: {:?}",
+                    time_now(),
+                    e
+                );
 
                 // retry downloading the same page
-                ctx.notify(SearchPageNo(page));
+                ctx.notify(search);
                 return;
-            }
+            },
         };
 
         // catch whatever happens in the deserialization
         let response = match response {
             Ok(res) => res,
             Err(e) => {
-                println!("[{}] Error deserializing JSON text: {:?}", time_now(), e);
+                println!(
+                    "[{}] Error deserializing JSON text: {:?}",
+                    time_now(),
+                    e
+                );
 
                 // retry downloading the same page
-                ctx.notify(SearchPageNo(page));
+                ctx.notify(search);
                 return;
-            }
+            },
         };
 
         // The query finishes if danbooru has no more posts returned.
@@ -196,11 +284,48 @@ impl Danbooru {
             println!("[{}] Finished! No more posts to get!", time_now());
             return;
         }
+                let lowest_id = response
+                    .iter()
+                    .min_by(|lpost, rpost| lpost.id.cmp(&rpost.id))
+                    .unwrap()
+                    .id
+                    .clone();
+                let highest_id = response
+                    .iter()
+                    .min_by(|lpost, rpost| lpost.id.cmp(&rpost.id))
+                    .unwrap()
+                    .id
+                    .clone();
+
+        let next_request = match search {
+            Search::Under(_) => {
+                let lowest_id = response
+                    .iter()
+                    .min_by(|lpost, rpost| lpost.id.cmp(&rpost.id))
+                    .unwrap()
+                    .id
+                    .clone();
+                Search::Under(lowest_id)
+            },
+
+            Search::Above(_) => {
+                let highest_id = response
+                    .iter()
+                    .max_by(|lpost, rpost| lpost.id.cmp(&rpost.id))
+                    .unwrap()
+                    .id
+                    .clone();
+                Search::Above(highest_id)
+            },
+
+            _ => unimplemented!(),
+        };
 
         self.process_post_list(response.into_iter(), ctx);
 
         // notify self to perform the next page
-        ctx.notify(SearchPageNo(page + 1))
+        // NOTE: not like this tho; rethink the process
+        ctx.notify(next_request);
     }
 }
 
@@ -212,14 +337,14 @@ impl Actor for Danbooru {
     }
 }
 
-impl Handles<SearchPageNo> for Danbooru {
+impl Handles<Search> for Danbooru {
     type Response = ();
 
     fn handle(
         &mut self,
-        msg: SearchPageNo,
+        msg: Search,
         ctx: &ContextImmutHalf<Self>,
     ) -> Self::Response {
-        self.page_request(msg.0, ctx);
+        self.request(msg, ctx);
     }
 }
