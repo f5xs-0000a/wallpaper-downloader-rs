@@ -13,6 +13,4 @@ futures = "0.1.24"
 chrono = "*"
 ws = "*"
 rocket = "*"
-
-[dependencies.sekibanki]
-path = "../LICHTFANTASIE/sekibanki/"
+sekibanki = { git = "https://github.com/f5xs-0000a/sekibanki.git" }
